@@ -11,11 +11,12 @@ import type { Kline } from '../services/binance';
 import type { IndicatorData, SignalMarker } from '../utils/indicators';
 
 interface TradingChartProps {
-
     data: Kline[];
     emaData: IndicatorData[];
     rsiData: IndicatorData[];
     signals: SignalMarker[];
+    currency: 'USDT' | 'INR';
+    rate: number;
 }
 
 export const TradingChart: React.FC<TradingChartProps> = ({
@@ -23,6 +24,8 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     emaData,
     rsiData,
     signals,
+    currency,
+    rate,
 }) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
@@ -40,17 +43,20 @@ export const TradingChart: React.FC<TradingChartProps> = ({
         close: number;
     } | null>(null);
 
-    // Memoize chart data transformations
+    // Memoize chart data transformations with conversion
     const candleData = useMemo(
         (): CandlestickData<Time>[] =>
-            data.map((d) => ({
-                time: d.time as Time,
-                open: d.open,
-                high: d.high,
-                low: d.low,
-                close: d.close,
-            })),
-        [data]
+            data.map((d) => {
+                const multiplier = currency === 'INR' ? rate : 1;
+                return {
+                    time: d.time as Time,
+                    open: d.open * multiplier,
+                    high: d.high * multiplier,
+                    low: d.low * multiplier,
+                    close: d.close * multiplier,
+                };
+            }),
+        [data, currency, rate]
     );
 
     const emaLineData = useMemo(
@@ -59,9 +65,9 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                 .filter((d) => d.ema !== undefined)
                 .map((d) => ({
                     time: d.time as Time,
-                    value: d.ema!,
+                    value: d.ema! * (currency === 'INR' ? rate : 1),
                 })),
-        [emaData]
+        [emaData, currency, rate]
     );
 
     const rsiLineData = useMemo(
@@ -165,9 +171,6 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                 param.point.y < 0 ||
                 param.point.y > chartContainerRef.current!.clientHeight
             ) {
-                // Clear tooltip or show last candle?
-                // For now, let's keep the last valid data or set to null
-                // setTooltipData(null); 
                 return;
             }
 
@@ -204,7 +207,6 @@ export const TradingChart: React.FC<TradingChartProps> = ({
         // Add markers for Buy/Sell signals
         if (signals.length > 0 && candlestickSeriesRef.current) {
             try {
-                // Type assertion needed as setMarkers may not be fully typed in some versions
                 (candlestickSeriesRef.current as any).setMarkers(
                     signals.map(s => ({
                         time: s.time as Time,
@@ -214,10 +216,8 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                         text: s.text,
                     }))
                 );
-                console.log(`Successfully set ${signals.length} markers on chart`);
             } catch (error) {
                 console.error('Error setting markers:', error);
-                console.log('Signals data:', signals.slice(0, 2)); // Log first 2 signals for debugging
             }
         }
     }, [candleData, emaLineData, rsiLineData, signals]);
@@ -241,12 +241,16 @@ export const TradingChart: React.FC<TradingChartProps> = ({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    const formatPrice = (price: number) => {
+        return currency === 'INR' ? `₹${price.toFixed(2)}` : `$${price.toFixed(2)}`;
+    };
+
     return (
         <div className="w-full h-full flex flex-col gap-4 p-4">
             {/* Main Price Chart */}
             <div className="bg-slate-900 rounded-lg shadow-xl p-4 relative">
                 <h2 className="text-xl font-bold mb-2 text-gray-100 flex items-center gap-4">
-                    <span>SOL/USDT - 1H</span>
+                    <span>SOL/{currency} - 1H</span>
                     {tooltipData && (
                         <div className="flex gap-4 text-xs font-mono font-normal">
                             <span className="text-gray-400">
@@ -258,24 +262,21 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                                 })}
                             </span>
                             <span className={tooltipData.close >= tooltipData.open ? 'text-green-400' : 'text-red-400'}>
-                                Open: ${tooltipData.open.toFixed(2)}
+                                O: {formatPrice(tooltipData.open)}
                             </span>
                             <span className={tooltipData.close >= tooltipData.open ? 'text-green-400' : 'text-red-400'}>
-                                High: ${tooltipData.high.toFixed(2)}
+                                H: {formatPrice(tooltipData.high)}
                             </span>
                             <span className={tooltipData.close >= tooltipData.open ? 'text-green-400' : 'text-red-400'}>
-                                Low: ${tooltipData.low.toFixed(2)}
+                                L: {formatPrice(tooltipData.low)}
                             </span>
                             <span className={tooltipData.close >= tooltipData.open ? 'text-green-400' : 'text-red-400'}>
-                                Close: ${tooltipData.close.toFixed(2)}
+                                C: {formatPrice(tooltipData.close)}
                             </span>
                         </div>
                     )}
                 </h2>
                 <div ref={chartContainerRef} className="w-full" />
-
-                {/* Floating Tooltip - Optional: could be fixed top-left inside chart area */}
-                {/* Currently integrated into header for cleaner look */}
             </div>
 
             {/* RSI Chart */}

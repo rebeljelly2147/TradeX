@@ -12,6 +12,8 @@ import {
 import { binanceWS } from './services/websocket';
 import './index.css';
 
+import { fetchUSDTToINR } from './utils/currency';
+
 function App() {
   const [data, setData] = useState<Kline[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,6 +118,24 @@ function App() {
     console.log('Clear signals clicked - will implement marker clearing');
   };
 
+  // Currency state
+  const [currency, setCurrency] = useState<'USDT' | 'INR'>('USDT');
+  const [inrRate, setInrRate] = useState<number>(87.50);
+
+  // Fetch INR rate periodically
+  useEffect(() => {
+    const updateRate = async () => {
+      const rate = await fetchUSDTToINR();
+      setInrRate(rate);
+      // console.log('Updated USDT/INR rate:', rate);
+    };
+
+    updateRate(); // Fetch immediately
+    const interval = setInterval(updateRate, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-950">
@@ -139,13 +159,24 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      <header className="bg-slate-900 border-b border-slate-700 px-6 py-4">
-        <h1 className="text-2xl font-bold text-gray-100">
-          Financial Charting Dashboard
-        </h1>
-        <p className="text-sm text-gray-400 mt-1">
-          Real-time SOL/USD analysis with EMA 50 and RSI 14
-        </p>
+      <header className="bg-slate-900 border-b border-slate-700 px-6 py-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-100">
+            Financial Charting Dashboard
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">
+            Real-time SOL/{currency} analysis with EMA 50 and RSI 14
+          </p>
+        </div>
+
+        <button
+          onClick={() => setCurrency(prev => prev === 'USDT' ? 'INR' : 'USDT')}
+          className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 font-medium transition-colors border border-slate-600 flex items-center gap-2"
+        >
+          <span>{currency === 'USDT' ? '🇺🇸 USDT' : '🇮🇳 INR'}</span>
+          <span className="text-slate-500">→</span>
+          <span>{currency === 'USDT' ? '🇮🇳 INR' : '🇺🇸 USDT'}</span>
+        </button>
       </header>
 
       <main className="container mx-auto px-4">
@@ -162,12 +193,16 @@ function App() {
         </div>
 
         {/* Trading Chart */}
-        <TradingChart
-          data={data}
-          emaData={emaData}
-          rsiData={rsiData}
-          signals={signals}
-        />
+        {data.length > 0 && (
+          <TradingChart
+            data={data}
+            emaData={emaData}
+            rsiData={rsiData}
+            signals={signals}
+            currency={currency}
+            rate={inrRate}
+          />
+        )}
       </main>
 
       <footer className="mt-8 pb-4 text-center text-sm text-gray-500">
