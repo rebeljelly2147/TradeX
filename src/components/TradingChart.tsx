@@ -32,6 +32,14 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     const rsiSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
     const rsiContainerRef = useRef<HTMLDivElement>(null);
 
+    const [tooltipData, setTooltipData] = React.useState<{
+        time: number;
+        open: number;
+        high: number;
+        low: number;
+        close: number;
+    } | null>(null);
+
     // Memoize chart data transformations
     const candleData = useMemo(
         (): CandlestickData<Time>[] =>
@@ -147,8 +155,39 @@ export const TradingChart: React.FC<TradingChartProps> = ({
         });
         rsiSeriesRef.current = rsiSeries;
 
+        // Tooltip logic
+        const updateTooltip = (param: any) => {
+            if (
+                param.point === undefined ||
+                !param.time ||
+                param.point.x < 0 ||
+                param.point.x > chartContainerRef.current!.clientWidth ||
+                param.point.y < 0 ||
+                param.point.y > chartContainerRef.current!.clientHeight
+            ) {
+                // Clear tooltip or show last candle?
+                // For now, let's keep the last valid data or set to null
+                // setTooltipData(null); 
+                return;
+            }
+
+            const candle = param.seriesData.get(candlestickSeries);
+            if (candle) {
+                setTooltipData({
+                    time: candle.time as number,
+                    open: candle.open,
+                    high: candle.high,
+                    low: candle.low,
+                    close: candle.close,
+                });
+            }
+        };
+
+        chart.subscribeCrosshairMove(updateTooltip);
+
         // Cleanup on unmount
         return () => {
+            chart.unsubscribeCrosshairMove(updateTooltip);
             chart.remove();
             rsiChart.remove();
         };
@@ -205,9 +244,38 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     return (
         <div className="w-full h-full flex flex-col gap-4 p-4">
             {/* Main Price Chart */}
-            <div className="bg-slate-900 rounded-lg shadow-xl p-4">
-                <h2 className="text-xl font-bold mb-2 text-gray-100">SOL/USD - 1H</h2>
+            <div className="bg-slate-900 rounded-lg shadow-xl p-4 relative">
+                <h2 className="text-xl font-bold mb-2 text-gray-100 flex items-center gap-4">
+                    <span>SOL/USDT - 1H</span>
+                    {tooltipData && (
+                        <div className="flex gap-4 text-xs font-mono font-normal">
+                            <span className="text-gray-400">
+                                {new Date(tooltipData.time * 1000).toLocaleString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                })}
+                            </span>
+                            <span className={tooltipData.close >= tooltipData.open ? 'text-green-400' : 'text-red-400'}>
+                                Open: ${tooltipData.open.toFixed(2)}
+                            </span>
+                            <span className={tooltipData.close >= tooltipData.open ? 'text-green-400' : 'text-red-400'}>
+                                High: ${tooltipData.high.toFixed(2)}
+                            </span>
+                            <span className={tooltipData.close >= tooltipData.open ? 'text-green-400' : 'text-red-400'}>
+                                Low: ${tooltipData.low.toFixed(2)}
+                            </span>
+                            <span className={tooltipData.close >= tooltipData.open ? 'text-green-400' : 'text-red-400'}>
+                                Close: ${tooltipData.close.toFixed(2)}
+                            </span>
+                        </div>
+                    )}
+                </h2>
                 <div ref={chartContainerRef} className="w-full" />
+
+                {/* Floating Tooltip - Optional: could be fixed top-left inside chart area */}
+                {/* Currently integrated into header for cleaner look */}
             </div>
 
             {/* RSI Chart */}
