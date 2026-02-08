@@ -29,9 +29,26 @@ function App() {
     enableRetest: true,
   });
 
+  // Currency state
+  const [currency, setCurrency] = useState<'USDT' | 'INR'>('USDT');
+  const [inrRate, setInrRate] = useState<number>(87.50);
 
+  // Timeframe state
+  const [interval, setIntervalState] = useState('1h');
+  const INTERVALS = ['1m', '3m', '5m', '15m', '1h', '4h', '1d', '1w'];
 
-  // ... (imports remain the same)
+  // Fetch INR rate periodically
+  useEffect(() => {
+    const updateRate = async () => {
+      const rate = await fetchUSDTToINR();
+      setInrRate(rate);
+    };
+
+    updateRate(); // Fetch immediately
+    const timer = setInterval(updateRate, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -39,12 +56,12 @@ function App() {
         setLoading(true);
         setError(null);
 
-        // Fetch SOL/USDT 1-hour candles (Binance uses USDT, not USD)
-        const klines = await fetchBinanceKlines('SOLUSDT', '1h', 500);
+        // Fetch SOL/USDT candles for selected interval
+        const klines = await fetchBinanceKlines('SOLUSDT', interval, 500);
         setData(klines);
 
         // Start WebSocket connection
-        binanceWS.connect('solusdt', '1h');
+        binanceWS.connect('solusdt', interval);
 
         // Subscribe to updates
         const unsubscribe = binanceWS.subscribe((newKline) => {
@@ -90,7 +107,7 @@ function App() {
     return () => {
       binanceWS.disconnect();
     };
-  }, []);
+  }, [interval]);
 
   // Calculate indicators
   const emaData = data.length > 0 ? calculateEMA(data, 50) : [];
@@ -118,23 +135,7 @@ function App() {
     console.log('Clear signals clicked - will implement marker clearing');
   };
 
-  // Currency state
-  const [currency, setCurrency] = useState<'USDT' | 'INR'>('USDT');
-  const [inrRate, setInrRate] = useState<number>(87.50);
 
-  // Fetch INR rate periodically
-  useEffect(() => {
-    const updateRate = async () => {
-      const rate = await fetchUSDTToINR();
-      setInrRate(rate);
-      // console.log('Updated USDT/INR rate:', rate);
-    };
-
-    updateRate(); // Fetch immediately
-    const interval = setInterval(updateRate, 60000); // Update every minute
-
-    return () => clearInterval(interval);
-  }, []);
 
   if (loading) {
     return (
@@ -165,18 +166,36 @@ function App() {
             Financial Charting Dashboard
           </h1>
           <p className="text-sm text-gray-400 mt-1">
-            Real-time SOL/{currency} analysis with EMA 50 and RSI 14
+            Real-time SOL/{currency} analysis ({interval}) with EMA 50 and RSI 14
           </p>
         </div>
 
-        <button
-          onClick={() => setCurrency(prev => prev === 'USDT' ? 'INR' : 'USDT')}
-          className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 font-medium transition-colors border border-slate-600 flex items-center gap-2"
-        >
-          <span>{currency === 'USDT' ? '🇺🇸 USDT' : '🇮🇳 INR'}</span>
-          <span className="text-slate-500">→</span>
-          <span>{currency === 'USDT' ? '🇮🇳 INR' : '🇺🇸 USDT'}</span>
-        </button>
+        <div className="flex items-center gap-4">
+          {/* Interval Selector */}
+          <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-600">
+            {INTERVALS.map((int) => (
+              <button
+                key={int}
+                onClick={() => setIntervalState(int)}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${interval === int
+                  ? 'bg-slate-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                  }`}
+              >
+                {int}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setCurrency(prev => prev === 'USDT' ? 'INR' : 'USDT')}
+            className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 font-medium transition-colors border border-slate-600 flex items-center gap-2"
+          >
+            <span>{currency === 'USDT' ? '🇺🇸 USDT' : '🇮🇳 INR'}</span>
+            <span className="text-slate-500">→</span>
+            <span>{currency === 'USDT' ? '🇮🇳 INR' : '🇺🇸 USDT'}</span>
+          </button>
+        </div>
       </header>
 
       <main className="container mx-auto px-4">
@@ -201,6 +220,7 @@ function App() {
             signals={signals}
             currency={currency}
             rate={inrRate}
+            interval={interval}
           />
         )}
       </main>
