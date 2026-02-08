@@ -9,6 +9,7 @@ import {
   calculateRSI,
   generateSignals,
 } from './utils/indicators';
+import { binanceWS } from './services/websocket';
 import './index.css';
 
 function App() {
@@ -26,6 +27,10 @@ function App() {
     enableRetest: true,
   });
 
+
+
+  // ... (imports remain the same)
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -35,6 +40,40 @@ function App() {
         // Fetch SOL/USDT 1-hour candles (Binance uses USDT, not USD)
         const klines = await fetchBinanceKlines('SOLUSDT', '1h', 500);
         setData(klines);
+
+        // Start WebSocket connection
+        binanceWS.connect('solusdt', '1h');
+
+        // Subscribe to updates
+        const unsubscribe = binanceWS.subscribe((newKline) => {
+          console.log('WS Update:', newKline.close, new Date(newKline.time * 1000).toLocaleTimeString());
+          setData((prevData) => {
+            if (prevData.length === 0) return [newKline];
+
+            const lastKline = prevData[prevData.length - 1];
+
+            // If the new kline has the same time as the last one, update it
+            if (lastKline.time === newKline.time) {
+              const newData = [...prevData];
+              newData[newData.length - 1] = newKline;
+              return newData;
+            }
+
+            // If the new kline is newer, append it
+            if (newKline.time > lastKline.time) {
+              return [...prevData, newKline];
+            }
+
+            return prevData;
+          });
+        });
+
+        // Cleanup function for this effect
+        return () => {
+          unsubscribe();
+          binanceWS.disconnect();
+        };
+
       } catch (err) {
         setError('Failed to load chart data. Please try again.');
         console.error(err);
@@ -44,6 +83,11 @@ function App() {
     };
 
     loadData();
+
+    // Cleanup on unmount (if component unmounts before loadData completes/returns)
+    return () => {
+      binanceWS.disconnect();
+    };
   }, []);
 
   // Calculate indicators
