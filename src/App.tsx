@@ -68,7 +68,7 @@ function App() {
         // Fetch candles for selected symbol and interval
         const selectedSymbol = SYMBOLS.find(s => s.name === symbol);
         if (!selectedSymbol) return;
-        
+
         const klines = await fetchBinanceKlines(selectedSymbol.pair, interval, 500);
         setData(klines);
 
@@ -189,11 +189,10 @@ function App() {
               <button
                 key={sym.name}
                 onClick={() => setSymbol(sym.name)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  symbol === sym.name
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${symbol === sym.name
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                }`}
+                  }`}
               >
                 {sym.name}
               </button>
@@ -250,6 +249,7 @@ function App() {
             currency={currency}
             rate={inrRate}
             interval={interval}
+            symbol={symbol}
           />
         )}
       </main>
