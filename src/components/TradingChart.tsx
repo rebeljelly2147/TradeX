@@ -18,6 +18,7 @@ interface TradingChartProps {
     currency: 'USDT' | 'INR';
     rate: number;
     interval: string;
+    symbol: string;
 }
 
 export const TradingChart: React.FC<TradingChartProps> = ({
@@ -28,6 +29,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     currency,
     rate,
     interval,
+    symbol,
 }) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
@@ -252,7 +254,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
             {/* Main Price Chart */}
             <div className="bg-slate-900 rounded-lg shadow-xl p-4 relative">
                 <h2 className="text-xl font-bold mb-2 text-gray-100 flex items-center gap-4">
-                    <span>SOL/{currency} - {interval}</span>
+                    <span>{symbol}/{currency} - {interval}</span>
                     {tooltipData && (
                         <div className="flex gap-4 text-xs font-mono font-normal">
                             <span className="text-gray-400">

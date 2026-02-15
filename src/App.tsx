@@ -37,6 +37,15 @@ function App() {
   const [interval, setIntervalState] = useState('1h');
   const INTERVALS = ['1m', '3m', '5m', '15m', '1h', '4h', '1d', '1w'];
 
+  // Symbol state
+  const [symbol, setSymbol] = useState('SOL');
+  const SYMBOLS = [
+    { name: 'BTC', pair: 'BTCUSDT', display: 'Bitcoin' },
+    { name: 'ETH', pair: 'ETHUSDT', display: 'Ethereum' },
+    { name: 'XRP', pair: 'XRPUSDT', display: 'XRP' },
+    { name: 'SOL', pair: 'SOLUSDT', display: 'Solana' },
+  ];
+
   // Fetch INR rate periodically
   useEffect(() => {
     const updateRate = async () => {
@@ -56,12 +65,15 @@ function App() {
         setLoading(true);
         setError(null);
 
-        // Fetch SOL/USDT candles for selected interval
-        const klines = await fetchBinanceKlines('SOLUSDT', interval, 500);
+        // Fetch candles for selected symbol and interval
+        const selectedSymbol = SYMBOLS.find(s => s.name === symbol);
+        if (!selectedSymbol) return;
+        
+        const klines = await fetchBinanceKlines(selectedSymbol.pair, interval, 500);
         setData(klines);
 
         // Start WebSocket connection
-        binanceWS.connect('solusdt', interval);
+        binanceWS.connect(selectedSymbol.pair.toLowerCase(), interval);
 
         // Subscribe to updates
         const unsubscribe = binanceWS.subscribe((newKline) => {
@@ -107,7 +119,7 @@ function App() {
     return () => {
       binanceWS.disconnect();
     };
-  }, [interval]);
+  }, [interval, symbol]);
 
   // Calculate indicators
   const emaData = data.length > 0 ? calculateEMA(data, 50) : [];
@@ -166,11 +178,28 @@ function App() {
             Financial Charting Dashboard
           </h1>
           <p className="text-sm text-gray-400 mt-1">
-            Real-time SOL/{currency} analysis ({interval}) with EMA 50 and RSI 14
+            Real-time {symbol}/{currency} analysis ({interval}) with EMA 50 and RSI 14
           </p>
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Symbol Selector */}
+          <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-600">
+            {SYMBOLS.map((sym) => (
+              <button
+                key={sym.name}
+                onClick={() => setSymbol(sym.name)}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  symbol === sym.name
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+              >
+                {sym.name}
+              </button>
+            ))}
+          </div>
+
           {/* Interval Selector */}
           <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-600">
             {INTERVALS.map((int) => (
